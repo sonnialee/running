@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>런닝 코스 추천 지도</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.1em;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .controls {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        .control-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            font-weight: 600;
+            color: #333;
+            min-width: 80px;
+        }
+
+        select, button {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .map-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        #map {
+            height: 600px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .course-info {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        .course-card {
+            background: linear-gradient(135deg, #00BFFF 0%, #1E90FF 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .course-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 191, 255, 0.4);
+        }
+
+        .course-card h3 {
+            margin-bottom: 8px;
+            font-size: 1.2em;
+        }
+
+        .course-details {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        @media (max-width: 768px) {
+            .control-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            #map {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏃‍♂️ 런닝 코스 추천</h1>
+        <p>당신에게 맞는 완벽한 런닝 코스를 찾아보세요</p>
+    </div>
+
+    <div class="container">
+        <div class="controls">
+            <div class="control-group">
+                <label for="distance">거리:</label>
+                <select id="distance">
+                    <option value="3">3km</option>
+                    <option value="5" selected>5km</option>
+                    <option value="10">10km</option>
+                    <option value="15">15km</option>
+                </select>
+
+                <label for="difficulty">난이도:</label>
+                <select id="difficulty">
+                    <option value="easy">쉬움</option>
+                    <option value="medium" selected>보통</option>
+                    <option value="hard">어려움</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="terrain">지형:</label>
+                <select id="terrain">
+                    <option value="park" selected>공원</option>
+                    <option value="river">강변</option>
+                    <option value="mountain">산책로</option>
+                    <option value="urban">도시</option>
+                </select>
+
+                <button onclick="findMyCourse()">내 코스 찾기</button>
+                <button onclick="getCurrentLocation()">현재 위치</button>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+
+        <div class="course-info">
+            <h2>🎯 추천 코스</h2>
+            <div id="coursesList">
+                <div class="loading">코스를 검색하려면 '내 코스 찾기' 버튼을 클릭하세요</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script>
+        let map;
+        let currentMarker;
+        let courseRoutes = [];
+
+        // 서울 중심으로 지도 초기화
+        function initMap() {
+            map = L.map('map').setView([37.5665, 126.9780], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        // 샘플 런닝 코스 데이터
+        const runningCourses = {
+            park: [
+                {
+                    name: "한강공원 여의도 코스",
+                    distance: 5,
+                    difficulty: "easy",
+                    description: "평평한 한강변 코스, 야경이 아름다움",
+                    coordinates: [[37.5219, 126.9330], [37.5280, 126.9180], [37.5340, 126.9250], [37.5290, 126.9380], [37.5219, 126.9330]]
+                },
+                {
+                    name: "올림픽공원 순환 코스",
+                    distance: 3,
+                    difficulty: "easy",
+                    description: "완만한 언덕과 호수가 있는 힐링 코스",
+                    coordinates: [[37.5200, 127.1220], [37.5180, 127.1180], [37.5150, 127.1200], [37.5170, 127.1250], [37.5200, 127.1220]]
+                }
+            ],
+            river: [
+                {
+                    name: "청계천 런닝 코스",
+                    distance: 10,
+                    difficulty: "medium",
+                    description: "도심 속 자연, 완만한 경사의 장거리 코스",
+                    coordinates: [[37.5694, 126.9784], [37.5650, 127.0050], [37.5620, 127.0180], [37.5600, 127.0250], [37.5580, 127.0320]]
+                }
+            ],
+            mountain: [
+                {
+                    name: "남산 둘레길",
+                    distance: 7,
+                    difficulty: "hard",
+                    description: "서울 전경을 감상하며 달리는 도전적인 코스",
+                    coordinates: [[37.5512, 126.9882], [37.5480, 126.9920], [37.5450, 126.9880], [37.5480, 126.9840], [37.5512, 126.9882]]
+                }
+            ],
+            urban: [
+                {
+                    name: "강남 테헤란로 코스",
+                    distance: 5,
+                    difficulty: "medium",
+                    description: "도시의 활기를 느끼며 달리는 도심 코스",
+                    coordinates: [[37.5012, 127.0396], [37.5050, 127.0550], [37.5020, 127.0580], [37.4980, 127.0450], [37.5012, 127.0396]]
+                }
+            ]
+        };
+
+        function findMyCourse() {
+            const distance = parseInt(document.getElementById('distance').value);
+            const difficulty = document.getElementById('difficulty').value;
+            const terrain = document.getElementById('terrain').value;
+
+            // 기존 경로 제거
+            courseRoutes.forEach(route => map.removeLayer(route));
+            courseRoutes = [];
+
+            // 조건에 맞는 코스 필터링
+            let filteredCourses = runningCourses[terrain] || [];
+            
+            // 거리와 난이도에 따른 추가 필터링
+            filteredCourses = filteredCourses.filter(course => {
+                const distanceDiff = Math.abs(course.distance - distance);
+                const difficultyMatch = course.difficulty === difficulty;
+                return distanceDiff <= 3 || difficultyMatch;
+            });
+
+            // 코스가 없으면 기본 코스 제공
+            if (filteredCourses.length === 0) {
+                filteredCourses = [
+                    {
+                        name: "맞춤형 기본 코스",
+                        distance: distance,
+                        difficulty: difficulty,
+                        description: `${distance}km ${difficulty} 레벨의 추천 코스입니다`,
+                        coordinates: generateRandomCourse(distance)
+                    }
+                ];
+            }
+
+            displayCourses(filteredCourses);
+            showCoursesOnMap(filteredCourses);
+        }
+
+        function generateRandomCourse(distance) {
+            // 서울 중심 좌표 기준으로 랜덤 코스 생성
+            const centerLat = 37.5665;
+            const centerLng = 126.9780;
+            const points = [];
+            const numPoints = Math.max(4, Math.floor(distance / 2));
+
+            for (let i = 0; i < numPoints; i++) {
+                const angle = (2 * Math.PI * i) / numPoints;
+                const radius = 0.01 * distance / 5;
+                const lat = centerLat + radius * Math.cos(angle) + (Math.random() - 0.5) * 0.005;
+                const lng = centerLng + radius * Math.sin(angle) + (Math.random() - 0.5) * 0.005;
+                points.push([lat, lng]);
+            }
+            points.push(points[0]); // 시작점으로 돌아오기
+            return points;
+        }
+
+        function displayCourses(courses) {
+            const coursesList = document.getElementById('coursesList');
+            coursesList.innerHTML = '';
+
+            courses.forEach((course, index) => {
+                const courseCard = document.createElement('div');
+                courseCard.className = 'course-card';
+                courseCard.onclick = () => focusOnCourse(index);
+                
+                courseCard.innerHTML = `
+                    <h3>${course.name}</h3>
+                    <p>${course.description}</p>
+                    <div class="course-details">
+                        <span>거리: ${course.distance}km</span>
+                        <span>난이도: ${course.difficulty}</span>
+                    </div>
+                `;
+                
+                coursesList.appendChild(courseCard);
+            });
+        }
+
+        function showCoursesOnMap(courses) {
+            courses.forEach((course, index) => {
+                const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57'];
+                const color = colors[index % colors.length];
+                
+                const polyline = L.polyline(course.coordinates, {
+                    color: color,
+                    weight: 4,
+                    opacity: 0.8
+                }).addTo(map);
+
+                // 시작점 마커
+                L.marker(course.coordinates[0])
+                    .addTo(map)
+                    .bindPopup(`<b>${course.name}</b><br>${course.description}`)
+                    .openPopup();
+
+                courseRoutes.push(polyline);
+            });
+
+            // 모든 코스가 보이도록 지도 범위 조정
+            if (courses.length > 0) {
+                const group = new L.featureGroup(courseRoutes);
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        function focusOnCourse(index) {
+            if (courseRoutes[index]) {
+                map.fitBounds(courseRoutes[index].getBounds().pad(0.2));
+            }
+        }
+
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        
+                        if (currentMarker) {
+                            map.removeLayer(currentMarker);
+                        }
+                        
+                        currentMarker = L.marker([lat, lng])
+                            .addTo(map)
+                            .bindPopup('현재 위치')
+                            .openPopup();
+                            
+                        map.setView([lat, lng], 15);
+                    },
+                    (error) => {
+                        alert('위치 정보를 가져올 수 없습니다.');
+                    }
+                );
+            } else {
+                alert('이 브라우저는 위치 서비스를 지원하지 않습니다.');
+            }
+        }
+
+        // 페이지 로드 시 지도 초기화
+        window.onload = function() {
+            initMap();
+        };
+    </script>
+</body>
+</html>
